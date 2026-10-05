@@ -28,15 +28,32 @@ jobs:
         run: |
           echo "$(brew --prefix)/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
-      - name: Build
+      - name: Build rootful
         run: |
           cd NoUpdateAlert
+          make clean
           make package FINALPACKAGE=1
+          mkdir -p ../artifacts/rootful
+          cp packages/*.deb ../artifacts/rootful/
+
+      - name: Build rootless
+        run: |
+          cd NoUpdateAlert
+          make clean
           make package THEOS_PACKAGE_SCHEME=rootless FINALPACKAGE=1
+          mkdir -p ../artifacts/rootless
+          cp packages/*.deb ../artifacts/rootless/
+
+      - name: Build roothide
+        run: |
+          cd NoUpdateAlert
+          make clean
           make package THEOS_PACKAGE_SCHEME=roothide FINALPACKAGE=1
+          mkdir -p ../artifacts/roothide
+          cp packages/*.deb ../artifacts/roothide/
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: NoUpdateAlert
-          path: NoUpdateAlert/packages/*.deb
+          path: artifacts/**/*.deb
