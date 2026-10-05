@@ -1,0 +1,9 @@
+Package: com.noupdatealert.tweak
+Name: NoUpdateAlert
+Version: 1.0.0
+Architecture: iphoneos-arm64e
+Description: 抖音优化插件去更新提示弹窗
+Maintainer: oyj1807554130
+Author: oyj1807554130
+Section: Tweaks
+Depends: mobilesubstrate
