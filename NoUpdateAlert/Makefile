@@ -6,6 +6,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = NoUpdateAlert
 NoUpdateAlert_FILES = Tweak.x
 NoUpdateAlert_CFLAGS = -fobjc-arc
-NoUpdateAlert_FRAMEWORKS = UIKit
+NoUpdateAlert_FRAMEWORKS = UIKit Foundation
+NoUpdateAlert_LIBRARIES = objc
 
 include $(THEOS_MAKE_PATH)/tweak.mk

@@ -1,7 +1,10 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
+
+static IMP orig_presentVC = NULL;
 
 static BOOL hasUpdateText(NSString *text) {
-    if (!text) return NO;
+    if (!text || text.length == 0) return NO;
     return [text containsString:@"更新"] ||
            [text containsString:@"新版本"] ||
            [text containsString:@"升级"] ||
@@ -19,14 +22,11 @@ static BOOL viewHasUpdateText(UIView *view) {
     if ([view isKindOfClass:[UILabel class]]) {
         UILabel *label = (UILabel *)view;
         if (hasUpdateText(label.text)) return YES;
-        if (label.attributedText) {
-            NSString *attrStr = [label.attributedText string];
-            if (hasUpdateText(attrStr)) return YES;
-        }
     }
     if ([view isKindOfClass:[UIButton class]]) {
         UIButton *btn = (UIButton *)view;
         if (hasUpdateText([btn titleForState:UIControlStateNormal])) return YES;
+        if (hasUpdateText([btn titleForState:UIControlStateHighlighted])) return YES;
     }
     for (UIView *sub in view.subviews) {
         if (viewHasUpdateText(sub)) return YES;
@@ -34,42 +34,53 @@ static BOOL viewHasUpdateText(UIView *view) {
     return NO;
 }
 
-%hook UIViewController
+static void replaced_presentVC(UIViewController *self, SEL _cmd,
+    UIViewController *vc, BOOL animated, void (^completion)(void)) {
 
-- (void)presentViewController:(UIViewController *)vc animated:(BOOL)a completion:(void (^)(void))c {
-    // 1. UIAlertController with update text
+    // 1. UIAlertController with update keywords
     if ([vc isKindOfClass:[UIAlertController class]]) {
         UIAlertController *ac = (UIAlertController *)vc;
         if (hasUpdateText(ac.title) || hasUpdateText(ac.message)) {
-            if (c) c();
+            if (completion) completion();
             return;
         }
     }
 
-    // 2. Check class name for Update/Renew/Spark
+    // 2. Class name contains Update/Renew/Spark
     NSString *cls = NSStringFromClass([vc class]);
     if ([cls containsString:@"Update"] || [cls containsString:@"Renew"] ||
         [cls containsString:@"Spark"]  || [cls containsString:@"Upgrade"]) {
-        if (c) c();
+        if (completion) completion();
         return;
     }
 
-    // 3. Check view hierarchy for update text labels
+    // 3. View hierarchy contains update text
     @try {
-        UIView *v = vc.view; // triggers viewDidLoad
+        UIView *v = vc.view;
         if (v && viewHasUpdateText(v)) {
-            if (c) c();
+            if (completion) completion();
             return;
         }
     } @catch (NSException *e) {}
 
-    %orig;
+    // Call original
+    ((void(*)(id,SEL,id,BOOL,void(^)(void)))orig_presentVC)(self, _cmd, vc, animated, completion);
 }
 
-%end
-
-%ctor {
+__attribute__((constructor))
+static void NoUpdateAlertInit() {
     @autoreleasepool {
+        // Hook presentViewController:animated:completion:
+        Class vcClass = objc_getClass("UIViewController");
+        if (vcClass) {
+            Method m = class_getInstanceMethod(vcClass,
+                sel_registerName("presentViewController:animated:completion:"));
+            if (m) {
+                orig_presentVC = method_setImplementation(m, (IMP)replaced_presentVC);
+            }
+        }
+
+        // Disable update checks via NSUserDefaults
         NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
         [ud setBool:NO forKey:@"sjj_spark_renew_enabled"];
         [ud setBool:NO forKey:@"sjj_remote_beta_update_reminder_enabled"];
